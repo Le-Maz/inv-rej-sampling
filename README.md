@@ -17,22 +17,13 @@ Classical rejection sampling produces a uniform sample from \{0, ..., q-1\} by d
 
 Inverse rejection sampling does the opposite:
 
-1. Start from a near-uniform sequence of 12-bit integers that already mixes *valid* \(< q\) and *invalid* \(≥ q\) values — exactly the kind of stream that classical rejection sampling would produce.
-2. Replace the valid slots, in order, with the payload you wish to hide.
-3. Leave the invalid slots untouched.
+1. Start from a uniform sequence of 12-bit integers.
+2. Replace the *valid* \(< q\) slots, in order, with the payload you wish to hide.
+3. Leave the *invalid* \(≥ q\) slots untouched.
 
 When encoding succeeds (i.e. the mask contains at least as many valid slots as the payload length), the resulting sequence is distributed uniformly across vectors of the mask's length with enough valid slots. The statistical distance from a true uniform binary sequence is therefore precisely the failure probability.
 
 Decoding simply extracts the valid slots again.
-
-## Why It Matters
-
-The technique supplies the missing building block for *obfuscating* structured finite-field objects:
-
-- ML-KEM public keys and ciphertexts can be mapped to (or recovered from) uniform-looking bit-strings.
-- The same idea appears in Kemeleon-style encodings and in any setting that needs to embed data inside randomness.
-
-Because the mapping is performed only on the valid positions, the overall distribution remains correct; an observer who does not know the payload cannot tell that encoding took place beyond the accepted advantage that scales as a negligible function of mask size.
 
 ## Constant-Time Realisations
 
