@@ -13,11 +13,11 @@ Traditional byte packing cannot hide this structure. The resulting bit-strings a
 
 **Inverse rejection sampling** is the dual of classical rejection sampling.
 
-Classical rejection sampling produces a uniform sample from \(\{0,\dots,q-1\}\) by drawing 12-bit integers and discarding those \(\ge q\).
+Classical rejection sampling produces a uniform sample from \{0, ..., q-1\} by drawing 12-bit integers and discarding those \(≥ q\).
 
 Inverse rejection sampling does the opposite:
 
-1. Start from a near-uniform sequence of 12-bit integers that already mixes *valid* (\(< q\)) and *invalid* (\(\ge q\)) values — exactly the kind of stream that classical rejection sampling would produce.
+1. Start from a near-uniform sequence of 12-bit integers that already mixes *valid* \(< q\) and *invalid* \(≥ q\) values — exactly the kind of stream that classical rejection sampling would produce.
 2. Replace the valid slots, in order, with the payload you wish to hide.
 3. Leave the invalid slots untouched.
 
@@ -47,7 +47,7 @@ Both control flow *and* memory access patterns are independent of secrets.
 A data-oblivious Bitonic sorting network moves every valid element to the front of the array, the payload is written sequentially, and an unsort step restores the original positions.  
 Stable and unstable variants exist; the stable variant is fully compatible with the PC-Sec output.
 
-A critical correctness condition for the Mem-Sec sort is that the comparator must decide solely on the *validity bit* (\(< q\) versus \(\ge q\)).  
+A critical correctness condition for the Mem-Sec sort is that the comparator must decide solely on the *validity bit* (\(< q\) versus \(≥ q\)).  
 Ranking valid elements by their numeric value would bias which of them are overwritten and would create a detectable statistical artefact.
 
 ## Properties
