@@ -1,3 +1,18 @@
 [workspace]
 resolver = "2"
 members = ["reference"]
+
+[package]
+name = "inv-rej-sampling"
+version = "0.1.0"
+edition = "2024"
+
+[profile.bench]
+debug = true
+
+[dependencies]
+ctutils = "0.4.2"
+
+[dev-dependencies]
+rand = { version = "0.10.2", features = ["chacha"] }
+reference = { path = "reference" }
