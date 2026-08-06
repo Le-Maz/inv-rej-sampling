@@ -44,6 +44,6 @@ Ranking valid elements by their numeric value would bias which of them are overw
 ## Properties
 
 - **Correctness** — encode followed by decode recovers the original payload whenever enough valid slots exist.
-- **Distributional closeness** — a successful encoding is uniform over vectors that contain enough valid slots; the distinguishing advantage against a truly uniform binary stream is therefore equal to the failure probability.
+- **Uniformity** — a successful encoding is uniform over vectors that contain enough valid slots; the distinguishing advantage against a truly uniform binary stream is therefore equal to the failure probability.
 - **Constant-time execution** under either the PC or the stronger Mem security model.
 - **Compatibility** — the stable memory-secure encoding produces identical results to the program-counter encoding.
