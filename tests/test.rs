@@ -1,4 +1,3 @@
-use std::fs;
 use std::iter::repeat;
 
 use inv_rej_sampling::*;
