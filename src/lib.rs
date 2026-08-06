@@ -1,5 +1,13 @@
 #![allow(unsafe_op_in_unsafe_fn)]
 
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+mod avx2;
+
+#[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
+mod wasm_simd;
+
+mod portable;
+
 use ctutils::{Choice, CtEq, CtLt, CtOption, CtSelect};
 use std::iter::repeat;
 
@@ -42,11 +50,7 @@ fn pack_msb_flag(val: u16) -> u16 {
     trimmed | (is_lt_bit << 15)
 }
 
-mod avx2;
-mod portable;
-
 pub fn sort_ct(arr: &mut [u16], transcript: &mut [u8]) {
-    let has_avx2 = is_x86_feature_detected!("avx2");
     let mut t_idx = 0;
     let mut k = 2usize;
     let padded_m = arr.len();
@@ -54,15 +58,42 @@ pub fn sort_ct(arr: &mut [u16], transcript: &mut [u8]) {
     while k <= padded_m {
         let mut j = k / 2;
         while j > 0 {
-            if j >= 16 && has_avx2 {
-                unsafe { avx2::stage_vec256_bitonic(arr, k, j, transcript, &mut t_idx) };
-            } else if j == 8 && has_avx2 {
-                unsafe { avx2::stage_vec_k8_bitonic(arr, k, transcript, &mut t_idx) };
-            } else if has_avx2 {
-                unsafe { avx2::stage_vec256_inreg_bitonic(arr, k, j, transcript, &mut t_idx) };
-            } else {
+            #[allow(unused_assignments, unused_mut)]
+            let mut _handled = false;
+
+            #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+            {
+                if is_x86_feature_detected!("avx2") {
+                    if j >= 16 {
+                        unsafe { avx2::stage_vec256_bitonic(arr, k, j, transcript, &mut t_idx) };
+                    } else if j == 8 {
+                        unsafe { avx2::stage_vec_k8_bitonic(arr, k, transcript, &mut t_idx) };
+                    } else {
+                        unsafe {
+                            avx2::stage_vec256_inreg_bitonic(arr, k, j, transcript, &mut t_idx)
+                        };
+                    }
+                    _handled = true;
+                }
+            }
+
+            #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
+            if !_handled {
+                if j >= 8 {
+                    unsafe { wasm_simd::stage_vec128_bitonic(arr, k, j, transcript, &mut t_idx) };
+                } else {
+                    unsafe {
+                        wasm_simd::stage_vec128_inreg_bitonic(arr, k, j, transcript, &mut t_idx)
+                    };
+                }
+                _handled = true;
+            }
+
+            #[allow(unreachable_code)]
+            if !_handled {
                 portable::stage_scalar_bitonic(arr, k, j, transcript, &mut t_idx);
             }
+
             j /= 2;
         }
         k *= 2;
@@ -70,22 +101,44 @@ pub fn sort_ct(arr: &mut [u16], transcript: &mut [u8]) {
 }
 
 pub fn sort_ct_no_transcript(arr: &mut [u16]) {
-    let has_avx2 = is_x86_feature_detected!("avx2");
     let mut k = 2usize;
     let padded_m = arr.len();
 
     while k <= padded_m {
         let mut j = k / 2;
         while j > 0 {
-            if j >= 16 && has_avx2 {
-                unsafe { avx2::stage_vec256_bitonic_no_transcript(arr, k, j) };
-            } else if j == 8 && has_avx2 {
-                unsafe { avx2::stage_vec_k8_bitonic_no_transcript(arr, k) };
-            } else if has_avx2 {
-                unsafe { avx2::stage_vec256_inreg_bitonic_no_transcript(arr, k, j) };
-            } else {
+            #[allow(unused_assignments, unused_mut)]
+            let mut _handled = false;
+
+            #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+            {
+                if is_x86_feature_detected!("avx2") {
+                    if j >= 16 {
+                        unsafe { avx2::stage_vec256_bitonic_no_transcript(arr, k, j) };
+                    } else if j == 8 {
+                        unsafe { avx2::stage_vec_k8_bitonic_no_transcript(arr, k) };
+                    } else {
+                        unsafe { avx2::stage_vec256_inreg_bitonic_no_transcript(arr, k, j) };
+                    }
+                    _handled = true;
+                }
+            }
+
+            #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
+            if !_handled {
+                if j >= 8 {
+                    unsafe { wasm_simd::stage_vec128_bitonic_no_transcript(arr, k, j) };
+                } else {
+                    unsafe { wasm_simd::stage_vec128_inreg_bitonic_no_transcript(arr, k, j) };
+                }
+                _handled = true;
+            }
+
+            #[allow(unreachable_code)]
+            if !_handled {
                 portable::stage_scalar_bitonic_no_transcript(arr, k, j);
             }
+
             j /= 2;
         }
         k *= 2;
@@ -93,17 +146,38 @@ pub fn sort_ct_no_transcript(arr: &mut [u16]) {
 }
 
 pub fn unsort_ct(arr: &mut [u16], transcript: &[u8]) {
-    let has_avx2 = is_x86_feature_detected!("avx2");
     let stages = generate_stage_offsets(arr.len());
 
     for &(_k, j, offset) in stages.iter().rev() {
-        if j >= 16 && has_avx2 {
-            unsafe { avx2::stage_vec256_bitonic_undo(arr, j, transcript, offset) };
-        } else if j == 8 && has_avx2 {
-            unsafe { avx2::stage_vec_k8_bitonic_undo(arr, transcript, offset) };
-        } else if has_avx2 {
-            unsafe { avx2::stage_vec256_inreg_bitonic_undo(arr, j, transcript, offset) };
-        } else {
+        #[allow(unused_assignments, unused_mut)]
+        let mut _handled = false;
+
+        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+        {
+            if is_x86_feature_detected!("avx2") {
+                if j >= 16 {
+                    unsafe { avx2::stage_vec256_bitonic_undo(arr, j, transcript, offset) };
+                } else if j == 8 {
+                    unsafe { avx2::stage_vec_k8_bitonic_undo(arr, transcript, offset) };
+                } else {
+                    unsafe { avx2::stage_vec256_inreg_bitonic_undo(arr, j, transcript, offset) };
+                }
+                _handled = true;
+            }
+        }
+
+        #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
+        if !_handled {
+            if j >= 8 {
+                unsafe { wasm_simd::stage_vec128_bitonic_undo(arr, j, transcript, offset) };
+            } else {
+                unsafe { wasm_simd::stage_vec128_inreg_bitonic_undo(arr, j, transcript, offset) };
+            }
+            _handled = true;
+        }
+
+        #[allow(unreachable_code)]
+        if !_handled {
             portable::stage_scalar_bitonic_undo(arr, j, transcript, offset);
         }
     }
@@ -269,17 +343,39 @@ pub fn decode_vector_mem_sec<const STABLE: bool>(
 }
 
 pub fn pack_data(data: &[u16], packed: &mut [u8]) {
-    if is_x86_feature_detected!("avx2") {
-        unsafe { avx2::pack_data_avx2(data, packed) };
-    } else {
-        portable::pack_data_portable(data, packed);
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    {
+        if is_x86_feature_detected!("avx2") {
+            unsafe { avx2::pack_data_avx2(data, packed) };
+            return;
+        }
     }
+
+    #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
+    {
+        unsafe { wasm_simd::pack_data_wasm(data, packed) };
+        return;
+    }
+
+    #[allow(unreachable_code)]
+    portable::pack_data_portable(data, packed);
 }
 
 pub fn unpack_data(packed: &[u8], data: &mut [u16]) {
-    if is_x86_feature_detected!("avx2") {
-        unsafe { avx2::unpack_data_avx2(packed, data) };
-    } else {
-        portable::unpack_data_portable(packed, data);
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    {
+        if is_x86_feature_detected!("avx2") {
+            unsafe { avx2::unpack_data_avx2(packed, data) };
+            return;
+        }
     }
+
+    #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
+    {
+        unsafe { wasm_simd::unpack_data_wasm(packed, data) };
+        return;
+    }
+
+    #[allow(unreachable_code)]
+    portable::unpack_data_portable(packed, data);
 }

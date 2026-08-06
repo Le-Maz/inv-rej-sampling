@@ -1,4 +1,3 @@
-use std::arch::x86_64::_rdtsc;
 use std::hint::black_box;
 
 use rand::rngs::Xoshiro128PlusPlus;
@@ -37,17 +36,34 @@ fn welchs_t_test(samples_a: &[u64], samples_b: &[u64]) -> f64 {
 }
 
 #[inline(never)]
-unsafe fn measure_cycles<F>(mut f: F) -> u64
+fn measure_cycles<F>(mut f: F) -> u64
 where
     F: FnMut(),
 {
     f();
 
-    let start = unsafe { _rdtsc() };
-    f();
-    let end = unsafe { _rdtsc() };
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    {
+        #[cfg(target_arch = "x86")]
+        use core::arch::x86::_rdtsc;
+        #[cfg(target_arch = "x86_64")]
+        use core::arch::x86_64::_rdtsc;
 
-    end - start
+        unsafe {
+            let start = _rdtsc();
+            f();
+            let end = _rdtsc();
+            end - start
+        }
+    }
+
+    #[cfg(not(any(target_arch = "x86", target_arch = "x86_64")))]
+    {
+        let start = std::time::Instant::now();
+        f();
+        let end = start.elapsed();
+        end.as_nanos() as u64
+    }
 }
 
 fn generate_inputs_class_a() -> ([u16; N], [u16; M]) {
@@ -83,23 +99,19 @@ fn test_encode_mem_sec_timing() {
         let (data_a, mask_a) = generate_inputs_class_a();
         let (data_b, mask_b) = generate_inputs_class_b(&mut prng);
 
-        let cycles_a = unsafe {
-            measure_cycles(|| {
-                black_box(encode_vector_mem_sec::<false>(
-                    black_box(&data_a),
-                    black_box(&mask_a),
-                ));
-            })
-        };
+        let cycles_a = measure_cycles(|| {
+            black_box(encode_vector_mem_sec::<false>(
+                black_box(&data_a),
+                black_box(&mask_a),
+            ));
+        });
 
-        let cycles_b = unsafe {
-            measure_cycles(|| {
-                black_box(encode_vector_mem_sec::<false>(
-                    black_box(&data_b),
-                    black_box(&mask_b),
-                ));
-            })
-        };
+        let cycles_b = measure_cycles(|| {
+            black_box(encode_vector_mem_sec::<false>(
+                black_box(&data_b),
+                black_box(&mask_b),
+            ));
+        });
 
         timings_a.push(cycles_a);
         timings_b.push(cycles_b);
@@ -130,17 +142,13 @@ fn test_encode_pc_sec_timing() {
         let (data_a, mask_a) = generate_inputs_class_a();
         let (data_b, mask_b) = generate_inputs_class_b(&mut prng);
 
-        let cycles_a = unsafe {
-            measure_cycles(|| {
-                black_box(encode_vector_pc_sec(black_box(&data_a), black_box(&mask_a)));
-            })
-        };
+        let cycles_a = measure_cycles(|| {
+            black_box(encode_vector_pc_sec(black_box(&data_a), black_box(&mask_a)));
+        });
 
-        let cycles_b = unsafe {
-            measure_cycles(|| {
-                black_box(encode_vector_pc_sec(black_box(&data_b), black_box(&mask_b)));
-            })
-        };
+        let cycles_b = measure_cycles(|| {
+            black_box(encode_vector_pc_sec(black_box(&data_b), black_box(&mask_b)));
+        });
 
         timings_a.push(cycles_a);
         timings_b.push(cycles_b);
@@ -175,17 +183,13 @@ fn test_decode_mem_sec_timing() {
             output_b[i] = prng.next_u32() as u16 % 4096;
         }
 
-        let cycles_a = unsafe {
-            measure_cycles(|| {
-                black_box(decode_vector_mem_sec::<false>(black_box(&output_a), N));
-            })
-        };
+        let cycles_a = measure_cycles(|| {
+            black_box(decode_vector_mem_sec::<false>(black_box(&output_a), N));
+        });
 
-        let cycles_b = unsafe {
-            measure_cycles(|| {
-                black_box(decode_vector_mem_sec::<false>(black_box(&output_b), N));
-            })
-        };
+        let cycles_b = measure_cycles(|| {
+            black_box(decode_vector_mem_sec::<false>(black_box(&output_b), N));
+        });
 
         timings_a.push(cycles_a);
         timings_b.push(cycles_b);
@@ -220,17 +224,13 @@ fn test_decode_pc_sec_timing() {
             output_b[i] = prng.next_u32() as u16 % 4096;
         }
 
-        let cycles_a = unsafe {
-            measure_cycles(|| {
-                black_box(decode_vector_pc_sec(black_box(&output_a), N));
-            })
-        };
+        let cycles_a = measure_cycles(|| {
+            black_box(decode_vector_pc_sec(black_box(&output_a), N));
+        });
 
-        let cycles_b = unsafe {
-            measure_cycles(|| {
-                black_box(decode_vector_pc_sec(black_box(&output_b), N));
-            })
-        };
+        let cycles_b = measure_cycles(|| {
+            black_box(decode_vector_pc_sec(black_box(&output_b), N));
+        });
 
         timings_a.push(cycles_a);
         timings_b.push(cycles_b);
